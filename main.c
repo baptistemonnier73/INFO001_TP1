@@ -8,6 +8,8 @@ typedef unsigned char byte;
 void hash_SHA1(const char *input, byte *hash);
 int computeN(const char *alphabet, int size);
 void i2c(const char *alphabet, int size, long input, char *output);
+uint64_t h2i(const unsigned char *y, uint64_t t, uint64_t N);
+
 
 int main(int argc, char **argv)
 {
@@ -55,7 +57,9 @@ int main(int argc, char **argv)
         printf("alphabet = '%s'\n", alphabet);
         printf("size = %d\n", size);
 
-        printf("N = %d\n\n", computeN(alphabet, size));
+        int N = computeN(alphabet, size);
+
+        printf("N = %d\n\n", N);
 
         if (strcmp(command, "config") == 0)
         {
@@ -84,6 +88,21 @@ int main(int argc, char **argv)
 
             printf("i2c(%d) = \"%s\"\n", input, output);
         }
+        if(strcmp(command, "h2i") == 0) {
+            byte hash[SHA_DIGEST_LENGTH];
+            unsigned char hexaHash[2 * SHA_DIGEST_LENGTH];
+
+            hash_SHA1(args[0], hash);
+
+            for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+            {
+                sprintf(hexaHash + i * 2, "%02x", hash[i]);
+            }
+
+            printf("hash(\"%s\") = %s\n", args[0], hexaHash);
+            printf("h2i(hash(\"%s\"), %llu) = %llu\n", args[0], atoi(args[1]), h2i(hash, atoi(args[1]), N));
+
+        }
     }
     else
     {
@@ -104,36 +123,45 @@ void hash_SHA1(const char *input, byte *hash)
 
 void i2c(const char *alphabet, int size, long input, char *output)
 {
-
+    // Indexes de chaque case du tableau de retour par rapport au tableau de l'alphabet (par exemple pour ABVM, ce sera {0, 1, 21, 12})
     int i[size];
 
+    // Initialisation de la valeur à retourner (par exemple AAAA)
     for (int j = 0; j < size; j++)
     {
         i[j] = 0;
         output[j] = alphabet[0];
     }
 
+    // Ne pas oublier le caractère nul à la fin
     output[size] = '\0';
 
+    // Conteur pour le tableau i défini plus haut ainsi que pour le tableau de retour (on se place dans un premier temps sur la dernière valeur de ces tableaux)
     int j = size - 1;
 
+    // On itère sur la valeur passée en paramètres (par exemple de 0 à 1233)
     for (int k = 0; k < input; k++)
     {
+        // Si on est pas encore au bout de l'alphabet
         if (i[j] < strlen(alphabet) - 1)
         {
             i[j]++;
             output[j] = alphabet[i[j]];
         }
+        // Sinon on décrémente j...
         else
         {
+            // ...jusqu'à ce qu'on trouve une valeur n'étant pas la dernière de l'alphabet ou que j devienne nul
             while(i[j] >= strlen(alphabet) - 1 && j >= 0) {
                 j--;
             }
+            // on incrémente j
             if (i[j] < strlen(alphabet) - 1)
             {
                 i[j]++;
                 output[j] = alphabet[i[j]];
             }
+            // puis on réinitialise les valeurs suivantes à la position 0 de l'alphabet
             while(j < size - 1) {
                 j++;
                 i[j] = 0;
@@ -142,3 +170,10 @@ void i2c(const char *alphabet, int size, long input, char *output)
         }
     }
 }
+
+uint64_t h2i(const unsigned char *y, uint64_t t, uint64_t N) {
+    uint64_t subY = *(uint64_t *)y;
+
+    return (subY + t) % N;
+}
+
